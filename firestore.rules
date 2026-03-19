@@ -1,0 +1,165 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required, immutable) - The unique ID of the user.
+    //   - email: string (required, format: email) - The email address of the user.
+    //   - displayName: string (optional) - The display name of the user.
+    //   - role: string (required, enum: ["admin", "user"]) - The role of the user.
+    //   - createdAt: timestamp (required, immutable) - When the user was created.
+    //
+    // Collection: posts
+    // Document ID: {postId}
+    // Fields:
+    //   - title: string (required, size: 1-100) - The title of the post.
+    //   - content: string (required, size: 1-5000) - The content of the post.
+    //   - authorUid: string (required, immutable) - The UID of the author.
+    //   - authorName: string (optional) - The name of the author.
+    //   - category: string (required, enum: ["Tech", "AI", "Software", "Technology", "Hustle", "Platforms"]) - The category of the post.
+    //   - createdAt: timestamp (required, immutable) - When the post was created.
+    //
+    // Collection: bankAccounts
+    // Document ID: {accountId}
+    // Fields:
+    //   - uid: string (required, immutable) - The UID of the owner.
+    //   - bankName: string (required, size: 1-100) - The name of the bank.
+    //   - accountNumber: string (required, size: 1-50) - The bank account number.
+    //   - routingNumber: string (required, size: 1-50) - The bank routing number.
+    //   - accountHolderName: string (required, size: 1-100) - The name of the account holder.
+    //   - createdAt: timestamp (required, immutable) - When the account was added.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "ictmajlisaoromiyaa@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'role', 'createdAt']) &&
+             hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ['admin', 'user'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidPost(data) {
+      return hasRequiredFields(['title', 'content', 'authorUid', 'category', 'createdAt']) &&
+             hasOnlyAllowedFields(['title', 'content', 'authorUid', 'authorName', 'category', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 5000 &&
+             data.authorUid is string &&
+             data.category in ['Tech', 'AI', 'Software', 'Technology', 'Hustle', 'Platforms'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidBankAccount(data) {
+      return hasRequiredFields(['uid', 'bankName', 'accountNumber', 'routingNumber', 'accountHolderName', 'createdAt']) &&
+             hasOnlyAllowedFields(['uid', 'bankName', 'accountNumber', 'routingNumber', 'accountHolderName', 'createdAt']) &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.bankName is string && data.bankName.size() > 0 && data.bankName.size() <= 100 &&
+             data.accountNumber is string && data.accountNumber.size() > 0 && data.accountNumber.size() <= 50 &&
+             data.routingNumber is string && data.routingNumber.size() > 0 && data.routingNumber.size() <= 50 &&
+             data.accountHolderName is string && data.accountHolderName.size() > 0 && data.accountHolderName.size() <= 100 &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Allow users to read their own profile, admins to read all profiles,
+      // and public to read admin profiles (for the Team section)
+      allow read: if isOwner(userId) || isAdmin() || (resource != null && resource.data.role == 'admin');
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin()) && uidNotModified();
+    }
+
+    match /posts/{postId} {
+      allow read: if true; // Posts are public
+      allow create: if isAdmin() && isValidPost(request.resource.data) && request.resource.data.authorUid == request.auth.uid;
+      allow update: if isAdmin() && isValidPost(request.resource.data) && request.resource.data.authorUid == resource.data.authorUid && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /bankAccounts/{accountId} {
+      // Strictly owner-only: No admin access to bank details
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow create: if isAuthenticated() && isValidBankAccount(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    match /tutorials/{tutorialId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tools/{toolId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /newsletter/{subId} {
+      allow create: if request.resource.data.email is string && request.resource.data.email.size() < 256;
+      allow read: if isAdmin();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

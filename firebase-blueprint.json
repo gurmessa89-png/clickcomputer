@@ -1,0 +1,116 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique ID of the user." },
+        "email": { "type": "string", "format": "email", "description": "The email address of the user." },
+        "displayName": { "type": "string", "description": "The display name of the user." },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "The role of the user." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the user was created." }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "A post created by an admin.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique ID of the post." },
+        "title": { "type": "string", "description": "The title of the post." },
+        "content": { "type": "string", "description": "The content of the post." },
+        "authorUid": { "type": "string", "description": "The UID of the author." },
+        "authorName": { "type": "string", "description": "The name of the author." },
+        "category": { "type": "string", "enum": ["Tech", "AI", "Software", "Technology", "Hustle", "Platforms"], "description": "The category of the post." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the post was created." }
+      },
+      "required": ["title", "content", "authorUid", "category", "createdAt"]
+    },
+    "BankAccount": {
+      "title": "BankAccount",
+      "description": "User's bank account information for billing/payouts.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The UID of the owner." },
+        "bankName": { "type": "string", "description": "The name of the bank." },
+        "accountNumber": { "type": "string", "description": "The bank account number." },
+        "routingNumber": { "type": "string", "description": "The bank routing number." },
+        "accountHolderName": { "type": "string", "description": "The name of the account holder." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the account was added." }
+      },
+      "required": ["uid", "bankName", "accountNumber", "routingNumber", "accountHolderName", "createdAt"]
+    },
+    "Tutorial": {
+      "title": "Tutorial",
+      "description": "Educational content with steps, video, and image.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "steps": { 
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "steps", "createdAt"]
+    },
+    "Tool": {
+      "title": "Tool",
+      "description": "A tool in the directory.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "url": { "type": "string" },
+        "category": { "type": "string" },
+        "icon": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "description", "url", "category", "createdAt"]
+    },
+    "NewsletterSubscription": {
+      "title": "NewsletterSubscription",
+      "description": "User email for newsletter.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "subscribedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "subscribedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores user profiles and roles."
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Stores posts created by admins."
+    },
+    "/bankAccounts/{accountId}": {
+      "schema": "BankAccount",
+      "description": "Stores user's bank account information. Strictly owner-only read/write."
+    },
+    "/tutorials/{tutorialId}": {
+      "schema": "Tutorial",
+      "description": "Stores educational tutorials."
+    },
+    "/tools/{toolId}": {
+      "schema": "Tool",
+      "description": "Stores tools in the directory."
+    },
+    "/newsletter/{subId}": {
+      "schema": "NewsletterSubscription",
+      "description": "Stores newsletter subscriptions."
+    }
+  }
+}
